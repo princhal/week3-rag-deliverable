@@ -1,0 +1,102 @@
+[
+  {
+    "id": "Q1",
+    "query": "What is the definition of [REPLACE: core technical term]?",
+    "type": "single-fact / definition",
+    "stress_target": "fixed",
+    "gold_page": null,
+    "gold_char_start": null,
+    "gold_char_end": null,
+    "notes": "Identify the passage that most directly defines the core term. Replace [REPLACE: ...] with actual content from your PDF."
+  },
+  {
+    "id": "Q2",
+    "query": "What are the main components of [REPLACE: central system or framework]?",
+    "type": "multi-part fact",
+    "stress_target": "structural",
+    "gold_page": null,
+    "gold_char_start": null,
+    "gold_char_end": null,
+    "notes": "Find the paragraph or list that enumerates the components."
+  },
+  {
+    "id": "Q3",
+    "query": "How does [REPLACE: concept A] differ from [REPLACE: concept B]?",
+    "type": "contrastive",
+    "stress_target": "all",
+    "gold_page": null,
+    "gold_char_start": null,
+    "gold_char_end": null,
+    "notes": "Find the passage that contains both sides of the contrast."
+  },
+  {
+    "id": "Q4",
+    "query": "What is the stated purpose of [REPLACE: methodology or approach] described in [REPLACE: section name]?",
+    "type": "context-dependent",
+    "stress_target": "structural",
+    "gold_page": null,
+    "gold_char_start": null,
+    "gold_char_end": null,
+    "notes": "Purpose statements often appear in section intros — structural chunking should keep heading + body together."
+  },
+  {
+    "id": "Q5",
+    "query": "What specific numerical value or statistic is reported for [REPLACE: metric or measure]?",
+    "type": "single precise fact",
+    "stress_target": "fixed",
+    "gold_page": null,
+    "gold_char_start": null,
+    "gold_char_end": null,
+    "notes": "Pick a specific number or percentage from the document."
+  },
+  {
+    "id": "Q6",
+    "query": "What step follows [REPLACE: action X] in the process described in [REPLACE: section]?",
+    "type": "sequential / procedural",
+    "stress_target": "semantic",
+    "gold_page": null,
+    "gold_char_start": null,
+    "gold_char_end": null,
+    "notes": "Sequential steps benefit from sentence-window overlap."
+  },
+  {
+    "id": "Q7",
+    "query": "What limitations or caveats does the document mention for [REPLACE: approach or method]?",
+    "type": "synthesis across sentences",
+    "stress_target": "semantic",
+    "gold_page": null,
+    "gold_char_start": null,
+    "gold_char_end": null,
+    "notes": "Limitations are often spread across 2-3 sentences; semantic window should capture them."
+  },
+  {
+    "id": "Q8",
+    "query": "What does the document recommend for [REPLACE: use case or scenario]?",
+    "type": "recommendation retrieval",
+    "stress_target": "structural",
+    "gold_page": null,
+    "gold_char_start": null,
+    "gold_char_end": null,
+    "notes": "Recommendations often close a section — structural chunking should keep them with context."
+  },
+  {
+    "id": "Q9",
+    "query": "What is the relationship between [REPLACE: entity A] and [REPLACE: entity B] as described in the document?",
+    "type": "cross-section synthesis",
+    "stress_target": "all",
+    "gold_page": null,
+    "gold_char_start": null,
+    "gold_char_end": null,
+    "notes": "Tests whether a single chunk contains enough signal for cross-document relationships."
+  },
+  {
+    "id": "Q10",
+    "query": "What evidence or example is given to support [REPLACE: key claim or argument]?",
+    "type": "evidence retrieval",
+    "stress_target": "structural",
+    "gold_page": null,
+    "gold_char_start": null,
+    "gold_char_end": null,
+    "notes": "Fixed-size may separate claim from evidence; structural should keep them together."
+  }
+]
