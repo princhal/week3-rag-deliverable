@@ -1,130 +1,80 @@
 """
 embed.py
 --------
-Generate embeddings for all chunks using OpenAI text-embedding-3-small
+Generate embeddings for all chunks using local sentence-transformers
+(all-MiniLM-L6-v2, 384 dimensions, CPU-only, no API key needed)
 and bulk-upsert into Supabase's document_chunks table.
 
-Batching: 100 chunks per API call
-Retry:    exponential backoff, max 3 retries on HTTP 429 / 500
+Model:    sentence-transformers/all-MiniLM-L6-v2 (384 dimensions)
+Batching: 100 chunks per call
 Upsert:   conflict on chunk_id (idempotent re-runs)
 """
 
 import json
 import os
-import time
 from pathlib import Path
 
-import psycopg2
-import psycopg2.extras
 from dotenv import load_dotenv
-from openai import OpenAI
-from tenacity import (
-    retry,
-    stop_after_attempt,
-    wait_exponential,
-    retry_if_exception_type,
-)
+from sentence_transformers import SentenceTransformer
+from supabase import create_client, Client
 from tqdm import tqdm
 
 load_dotenv()
 
-EMBEDDING_MODEL = "text-embedding-3-small"
-EMBEDDING_DIM = 1536
+EMBEDDING_MODEL_NAME = "all-MiniLM-L6-v2"
+EMBEDDING_DIM = 384
 BATCH_SIZE = 100
 
-# ---------------------------------------------------------------------------
-# OpenAI client
-# ---------------------------------------------------------------------------
-
-_client = None
+# Lazy-load model (downloads ~90MB on first run, cached after)
+_model = None
 
 
-def _get_openai_client() -> OpenAI:
-    global _client
-    if _client is None:
-        api_key = os.environ.get("OPENAI_API_KEY")
-        if not api_key:
-            raise EnvironmentError("OPENAI_API_KEY not set in environment or .env file")
-        _client = OpenAI(api_key=api_key)
-    return _client
+def _get_model() -> SentenceTransformer:
+    global _model
+    if _model is None:
+        print(f"  Loading model: {EMBEDDING_MODEL_NAME} (first run downloads ~90MB)...")
+        _model = SentenceTransformer(EMBEDDING_MODEL_NAME)
+    return _model
 
 
 # ---------------------------------------------------------------------------
-# Retry-wrapped embedding call
+# Embedding functions (same signatures as before)
 # ---------------------------------------------------------------------------
 
-@retry(
-    retry=retry_if_exception_type(Exception),
-    wait=wait_exponential(multiplier=1, min=2, max=30),
-    stop=stop_after_attempt(3),
-    reraise=True,
-)
 def _embed_batch(texts: list[str]) -> list[list[float]]:
     """
-    Call OpenAI embeddings API for a batch of texts.
-    Returns list of embedding vectors in same order as input.
+    Embed a batch of texts for indexing (document chunks).
+    Returns list of 384-dim vectors in same order as input.
     """
-    client = _get_openai_client()
-    response = client.embeddings.create(
-        model=EMBEDDING_MODEL,
-        input=texts,
-    )
-    # Response embeddings are ordered by index
-    return [item.embedding for item in sorted(response.data, key=lambda x: x.index)]
+    model = _get_model()
+    embeddings = model.encode(texts, batch_size=BATCH_SIZE, show_progress_bar=False)
+    return embeddings.tolist()
 
 
-# ---------------------------------------------------------------------------
-# Database connection
-# ---------------------------------------------------------------------------
-
-def _get_db_conn():
-    db_url = os.environ.get("SUPABASE_DB_URL")
-    if not db_url:
-        raise EnvironmentError("SUPABASE_DB_URL not set in environment or .env file")
-    return psycopg2.connect(db_url)
-
-
-# ---------------------------------------------------------------------------
-# Bulk upsert
-# ---------------------------------------------------------------------------
-
-UPSERT_SQL = """
-INSERT INTO document_chunks
-    (chunk_id, strategy, source_doc, source_page, char_start, char_end,
-     token_count, chunk_text, embedding)
-VALUES %s
-ON CONFLICT (chunk_id) DO UPDATE SET
-    strategy    = EXCLUDED.strategy,
-    source_doc  = EXCLUDED.source_doc,
-    source_page = EXCLUDED.source_page,
-    char_start  = EXCLUDED.char_start,
-    char_end    = EXCLUDED.char_end,
-    token_count = EXCLUDED.token_count,
-    chunk_text  = EXCLUDED.chunk_text,
-    embedding   = EXCLUDED.embedding;
-"""
-
-
-def _upsert_batch(conn, rows: list[tuple]) -> None:
+def _embed_query(text: str) -> list[float]:
     """
-    Bulk upsert a batch of rows into document_chunks.
-    Each row: (chunk_id, strategy, source_doc, source_page, char_start,
-               char_end, token_count, chunk_text, embedding_str)
+    Embed a single query string for retrieval.
     """
-    with conn.cursor() as cur:
-        psycopg2.extras.execute_values(
-            cur,
-            UPSERT_SQL,
-            rows,
-            template=None,
-            page_size=BATCH_SIZE,
-        )
-    conn.commit()
+    model = _get_model()
+    embedding = model.encode([text], show_progress_bar=False)
+    return embedding[0].tolist()
 
 
-def _vector_to_pg(embedding: list[float]) -> str:
-    """Convert a Python list of floats to pgvector literal string '[f1,f2,...]'."""
-    return "[" + ",".join(str(v) for v in embedding) + "]"
+# ---------------------------------------------------------------------------
+# Supabase client
+# ---------------------------------------------------------------------------
+
+def _get_supabase_client() -> Client:
+    url = os.environ.get("SUPABASE_URL")
+    key = os.environ.get("SUPABASE_SERVICE_KEY")
+    if not url or not key:
+        raise EnvironmentError("SUPABASE_URL and SUPABASE_SERVICE_KEY must be set in .env")
+    return create_client(url, key)
+
+
+def _upsert_batch(client: Client, rows: list[dict]) -> None:
+    """Bulk upsert a batch of chunk dicts into document_chunks via Supabase."""
+    client.table("document_chunks").upsert(rows, on_conflict="chunk_id").execute()
 
 
 # ---------------------------------------------------------------------------
@@ -136,24 +86,20 @@ def embed_and_ingest(
     output_dir: str = "data",
 ) -> None:
     """
-    For each chunk in `chunks`:
-      1. Batch embed via OpenAI API (100 chunks/call)
+    For each chunk:
+      1. Batch embed locally via sentence-transformers
       2. Bulk upsert into document_chunks table
-
-    Args:
-        chunks:     List of chunk dicts from chunk.py
-        output_dir: Directory to write embed_log.json (progress log)
     """
     if not chunks:
         print("No chunks to embed.")
         return
 
     output_dir = Path(output_dir)
-    conn = _get_db_conn()
+    client = _get_supabase_client()
 
     total = len(chunks)
-    print(f"\nEmbedding {total} chunks in batches of {BATCH_SIZE}...")
-    print(f"  Model: {EMBEDDING_MODEL} (dim={EMBEDDING_DIM})")
+    print(f"\nEmbedding {total} chunks locally in batches of {BATCH_SIZE}...")
+    print(f"  Model: {EMBEDDING_MODEL_NAME} (dim={EMBEDDING_DIM}, CPU-only)")
 
     embedded_count = 0
     failed_batches = []
@@ -178,27 +124,26 @@ def embed_and_ingest(
                     f"Unexpected embedding dimension: {len(emb)} (expected {EMBEDDING_DIM})"
                 )
 
-        # Build DB rows
+        # Build rows as dicts for Supabase client
         rows = []
         for chunk, embedding in zip(batch, embeddings):
-            rows.append((
-                chunk["chunk_id"],
-                chunk["strategy"],
-                chunk["source_doc"],
-                chunk["source_page"],
-                chunk["char_start"],
-                chunk["char_end"],
-                chunk["token_count"],
-                chunk["chunk_text"],
-                _vector_to_pg(embedding),
-            ))
+            rows.append({
+                "chunk_id":    chunk["chunk_id"],
+                "strategy":    chunk["strategy"],
+                "source_doc":  chunk["source_doc"],
+                "source_page": chunk["source_page"],
+                "char_start":  chunk["char_start"],
+                "char_end":    chunk["char_end"],
+                "token_count": chunk["token_count"],
+                "chunk_text":  chunk["chunk_text"],
+                "embedding":   embedding,
+            })
 
         try:
-            _upsert_batch(conn, rows)
+            _upsert_batch(client, rows)
             embedded_count += len(batch)
         except Exception as e:
             print(f"\n  DB ERROR on batch {batch_idx}: {e}")
-            conn.rollback()
             failed_batches.append(batch_idx)
             continue
 
@@ -207,8 +152,6 @@ def embed_and_ingest(
             "count": len(batch),
             "strategy_sample": batch[0]["strategy"],
         })
-
-    conn.close()
 
     # Write log
     log_path = output_dir / "embed_log.json"
@@ -226,28 +169,31 @@ def embed_and_ingest(
 
 
 def verify_ingestion(expected_strategies: list[str] = None) -> None:
-    """
-    Print row counts per strategy from the database.
-    Useful post-ingestion verification.
-    """
+    """Print row counts per strategy from the database."""
     if expected_strategies is None:
         expected_strategies = ["fixed", "structural", "semantic"]
 
-    conn = _get_db_conn()
-    with conn.cursor() as cur:
-        cur.execute(
-            "SELECT strategy, COUNT(*) AS n, ROUND(AVG(token_count)) AS avg_tokens "
-            "FROM document_chunks GROUP BY strategy ORDER BY strategy;"
-        )
-        rows = cur.fetchall()
-    conn.close()
+    client = _get_supabase_client()
+    response = client.table("document_chunks").select("strategy, token_count").execute()
+    rows = response.data
+
+    from collections import Counter
+    counts = Counter(r["strategy"] for r in rows)
+    token_sums: dict = {}
+    token_counts_by_strategy: dict = {}
+    for r in rows:
+        s = r["strategy"]
+        token_sums[s] = token_sums.get(s, 0) + r["token_count"]
+        token_counts_by_strategy[s] = token_counts_by_strategy.get(s, 0) + 1
 
     print("\nIngestion verification:")
     print(f"  {'Strategy':<15} {'Count':>8} {'Avg Tokens':>12}")
     print(f"  {'-'*15} {'-'*8} {'-'*12}")
     found = set()
-    for strategy, count, avg_tokens in rows:
-        print(f"  {strategy:<15} {count:>8} {avg_tokens:>12}")
+    for strategy in sorted(counts):
+        count = counts[strategy]
+        avg = token_sums[strategy] // token_counts_by_strategy[strategy]
+        print(f"  {strategy:<15} {count:>8} {avg:>12}")
         found.add(strategy)
 
     missing = set(expected_strategies) - found
@@ -260,12 +206,10 @@ def verify_ingestion(expected_strategies: list[str] = None) -> None:
 if __name__ == "__main__":
     import sys
     data_dir = sys.argv[1] if len(sys.argv) > 1 else "data"
-
     chunks_path = Path(data_dir) / "chunks.json"
     if not chunks_path.exists():
         print(f"chunks.json not found at {chunks_path}. Run chunk.py first.")
         sys.exit(1)
-
     chunks = json.loads(chunks_path.read_text(encoding="utf-8"))
     embed_and_ingest(chunks, data_dir)
     verify_ingestion()

@@ -24,7 +24,14 @@ from pathlib import Path
 from typing import Optional
 
 import tiktoken
-import spacy
+import nltk
+from nltk.tokenize import sent_tokenize
+
+# Ensure NLTK punkt data is available
+try:
+    nltk.data.find("tokenizers/punkt_tab")
+except LookupError:
+    nltk.download("punkt_tab", quiet=True)
 
 # ---------------------------------------------------------------------------
 # Shared utilities
@@ -32,21 +39,6 @@ import spacy
 
 SENTINEL_RE = re.compile(r"<<<PAGE_BREAK:\d+>>>")
 ENCODING = tiktoken.get_encoding("cl100k_base")
-
-# Lazy-load spaCy model (only needed for semantic strategy)
-_NLP = None
-
-
-def _get_nlp():
-    global _NLP
-    if _NLP is None:
-        try:
-            _NLP = spacy.load("en_core_web_sm")
-        except OSError:
-            raise OSError(
-                "spaCy model not found. Run: python -m spacy download en_core_web_sm"
-            )
-    return _NLP
 
 
 def _token_count(text: str) -> int:
@@ -338,17 +330,13 @@ def chunk_semantic(
     Window: 5 sentences, stride: 2 (60% overlap).
     Falls back to 3-sentence window if token count exceeds 512.
     """
-    nlp = _get_nlp()
-
-    # Remove sentinels before NLP (spaCy may misparse them)
-    # Track original offsets via position mapping
+    # Remove sentinels before sentence tokenization
     positions = []
     sentinel_free_chars = []
     i = 0
     while i < len(cleaned_text):
         m = SENTINEL_RE.match(cleaned_text, i)
         if m:
-            # For each sentinel char, we record None (not mappable)
             i = m.end()
             continue
         sentinel_free_chars.append(cleaned_text[i])
@@ -357,10 +345,19 @@ def chunk_semantic(
 
     sentinel_free_text = "".join(sentinel_free_chars)
 
-    # Run spaCy sentence segmentation
-    # Disable unnecessary pipeline components for speed
-    doc = nlp(sentinel_free_text, disable=["ner", "tagger", "lemmatizer", "attribute_ruler"])
-    sentences = list(doc.sents)
+    # Use NLTK for sentence tokenization
+    raw_sentences = sent_tokenize(sentinel_free_text)
+
+    # Build sentence objects with char offsets
+    sentences = []
+    cursor = 0
+    for sent in raw_sentences:
+        start = sentinel_free_text.find(sent, cursor)
+        if start == -1:
+            start = cursor
+        end = start + len(sent)
+        sentences.append((sent, start, end))
+        cursor = end
 
     if len(sentences) < SEMANTIC_WINDOW:
         print(f"  WARNING: Only {len(sentences)} sentences found — fewer than window size {SEMANTIC_WINDOW}")
@@ -376,14 +373,14 @@ def chunk_semantic(
         window_sents = sentences[i:end_idx]
 
         # Get char offsets in sentinel_free_text
-        sf_start = window_sents[0].start_char
-        sf_end = window_sents[-1].end_char
+        sf_start = window_sents[0][1]
+        sf_end = window_sents[-1][2]
 
         # Map back to original cleaned_text offsets
         orig_start = positions[sf_start] if sf_start < len(positions) else len(cleaned_text)
         orig_end = positions[sf_end - 1] + 1 if sf_end - 1 < len(positions) else len(cleaned_text)
 
-        chunk_text = " ".join(s.text.strip() for s in window_sents)
+        chunk_text = " ".join(s[0].strip() for s in window_sents)
         tc = _token_count(chunk_text)
 
         # Reduce window if over token limit
@@ -392,11 +389,11 @@ def chunk_semantic(
             window_size = 3
             end_idx = min(i + window_size, len(sentences))
             window_sents = sentences[i:end_idx]
-            sf_start = window_sents[0].start_char
-            sf_end = window_sents[-1].end_char
+            sf_start = window_sents[0][1]
+            sf_end = window_sents[-1][2]
             orig_start = positions[sf_start] if sf_start < len(positions) else len(cleaned_text)
             orig_end = positions[sf_end - 1] + 1 if sf_end - 1 < len(positions) else len(cleaned_text)
-            chunk_text = " ".join(s.text.strip() for s in window_sents)
+            chunk_text = " ".join(s[0].strip() for s in window_sents)
 
         page = _resolve_page(orig_start, page_offsets)
         chunk = _make_chunk("semantic", source_doc, page, seq, orig_start, orig_end, chunk_text)

@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>RAG Chunking Explorer</title>
+<style>
+  /* ── Reset & base ───────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg:       #0f1117;
+    --surface:  #1a1d27;
+    --border:   #2a2d3e;
+    --text:     #e2e8f0;
+    --muted:    #8892a4;
+    --accent:   #6366f1;
+    --green:    #22c55e;
+    --amber:    #f59e0b;
+    --red:      #ef4444;
+    --fixed:    #6366f1;
+    --struct:   #22c55e;
+    --semantic: #f59e0b;
+  }
+  body { background: var(--bg); color: var(--text); font-family: 'Inter', system-ui, sans-serif; font-size: 14px; }
+  a { color: var(--accent); text-decoration: none; }
+
+  /* ── Layout ─────────────────────────────────────────────────── */
+  .shell { display: flex; min-height: 100vh; }
+  nav { width: 220px; background: var(--surface); border-right: 1px solid var(--border); padding: 24px 0; flex-shrink: 0; position: fixed; top: 0; bottom: 0; overflow-y: auto; }
+  main { margin-left: 220px; padding: 32px; flex: 1; max-width: 1300px; }
+
+  /* ── Nav ─────────────────────────────────────────────────────── */
+  .nav-logo { padding: 0 20px 24px; border-bottom: 1px solid var(--border); margin-bottom: 16px; }
+  .nav-logo h1 { font-size: 15px; font-weight: 700; color: var(--text); line-height: 1.3; }
+  .nav-logo p { font-size: 11px; color: var(--muted); margin-top: 4px; }
+  .nav-item { display: flex; align-items: center; gap: 10px; padding: 10px 20px; cursor: pointer; color: var(--muted); font-size: 13px; border-left: 3px solid transparent; transition: all .15s; }
+  .nav-item:hover { background: rgba(99,102,241,.08); color: var(--text); }
+  .nav-item.active { background: rgba(99,102,241,.12); color: var(--accent); border-left-color: var(--accent); }
+  .nav-icon { width: 18px; opacity: .8; }
+
+  /* ── Pages ───────────────────────────────────────────────────── */
+  .page { display: none; }
+  .page.active { display: block; }
+
+  /* ── Page header ─────────────────────────────────────────────── */
+  .page-header { margin-bottom: 28px; }
+  .page-header h2 { font-size: 22px; font-weight: 700; }
+  .page-header p { color: var(--muted); margin-top: 6px; font-size: 13px; }
+
+  /* ── Cards ───────────────────────────────────────────────────── */
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px; }
+  .card-title { font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 12px; }
+
+  /* ── Stat cards row ──────────────────────────────────────────── */
+  .stat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 16px; margin-bottom: 28px; }
+  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px; }
+  .stat-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+  .stat-value { font-size: 28px; font-weight: 700; margin-top: 6px; line-height: 1; }
+  .stat-sub { font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+  /* ── Strategy badges ─────────────────────────────────────────── */
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+  .badge-fixed    { background: rgba(99,102,241,.2);  color: #818cf8; }
+  .badge-struct   { background: rgba(34,197,94,.2);   color: #4ade80; }
+  .badge-semantic { background: rgba(245,158,11,.2);  color: #fcd34d; }
+
+  /* ── Comparison table ────────────────────────────────────────── */
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; padding: 10px 14px; color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  td { padding: 10px 14px; border-bottom: 1px solid rgba(255,255,255,.04); vertical-align: top; }
+  tr:hover td { background: rgba(255,255,255,.02); }
+  .hit-1 { color: var(--green); font-weight: 700; }
+  .hit-0 { color: var(--muted); }
+  .cosine-bar { display: flex; align-items: center; gap: 8px; }
+  .cosine-track { flex: 1; height: 5px; background: var(--border); border-radius: 3px; overflow: hidden; }
+  .cosine-fill { height: 100%; border-radius: 3px; }
+  .avg-row td { font-weight: 700; background: rgba(99,102,241,.07); border-top: 1px solid var(--border); }
+  .winner-fixed    { color: #818cf8; font-weight: 600; }
+  .winner-struct   { color: #4ade80; font-weight: 600; }
+  .winner-semantic { color: #fcd34d; font-weight: 600; }
+
+  /* ── Strategy summary cards ──────────────────────────────────── */
+  .strategy-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 28px; }
+  @media (max-width: 900px) { .strategy-grid { grid-template-columns: 1fr; } }
+  .strategy-card { border-radius: 10px; padding: 20px; border: 1px solid; }
+  .strategy-card.fixed    { background: rgba(99,102,241,.07); border-color: rgba(99,102,241,.3); }
+  .strategy-card.struct   { background: rgba(34,197,94,.07);  border-color: rgba(34,197,94,.3); }
+  .strategy-card.semantic { background: rgba(245,158,11,.07); border-color: rgba(245,158,11,.3); }
+  .strategy-name { font-size: 15px; font-weight: 700; margin-bottom: 14px; }
+  .metric-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 12px; }
+  .metric-label { color: var(--muted); }
+  .metric-val { font-weight: 700; font-size: 15px; }
+  .progress-bar { height: 4px; background: var(--border); border-radius: 2px; margin-top: 6px; overflow: hidden; }
+  .progress-fill { height: 100%; border-radius: 2px; }
+  .fixed .progress-fill    { background: #6366f1; }
+  .struct .progress-fill   { background: #22c55e; }
+  .semantic .progress-fill { background: #f59e0b; }
+
+  /* ── Query explorer ──────────────────────────────────────────── */
+  .query-grid { display: grid; grid-template-columns: 300px 1fr; gap: 20px; }
+  @media (max-width: 900px) { .query-grid { grid-template-columns: 1fr; } }
+  .query-list { display: flex; flex-direction: column; gap: 8px; }
+  .query-item { padding: 12px 14px; border-radius: 8px; cursor: pointer; border: 1px solid var(--border); transition: all .15s; }
+  .query-item:hover { border-color: var(--accent); background: rgba(99,102,241,.06); }
+  .query-item.active { border-color: var(--accent); background: rgba(99,102,241,.1); }
+  .query-id { font-size: 11px; font-weight: 700; color: var(--muted); }
+  .query-text { font-size: 12px; margin-top: 4px; line-height: 1.4; }
+  .query-type { font-size: 10px; color: var(--muted); margin-top: 6px; }
+
+  .result-panel { display: flex; flex-direction: column; gap: 16px; }
+  .result-section { }
+  .result-section-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .result-chunks { display: flex; flex-direction: column; gap: 8px; }
+  .result-chunk { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 14px; cursor: pointer; transition: border-color .15s; }
+  .result-chunk:hover { border-color: var(--muted); }
+  .result-chunk-meta { display: flex; gap: 12px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
+  .rank-badge { width: 22px; height: 22px; border-radius: 50%; background: var(--border); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; }
+  .rank-1 { background: #f59e0b; color: #000; }
+  .rank-2 { background: #94a3b8; color: #000; }
+  .rank-3 { background: #92400e; color: #fff; }
+  .score-pill { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 10px; background: rgba(99,102,241,.2); color: #818cf8; }
+  .page-pill { font-size: 11px; color: var(--muted); }
+  .chunk-preview { font-size: 12px; color: var(--muted); line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
+
+  /* ── Live search ─────────────────────────────────────────────── */
+  .search-box { display: flex; gap: 12px; margin-bottom: 24px; }
+  .search-input { flex: 1; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px 16px; color: var(--text); font-size: 14px; outline: none; transition: border-color .15s; }
+  .search-input:focus { border-color: var(--accent); }
+  .search-btn { background: var(--accent); color: #fff; border: none; border-radius: 8px; padding: 12px 24px; font-size: 14px; font-weight: 600; cursor: pointer; transition: opacity .15s; white-space: nowrap; }
+  .search-btn:hover { opacity: .85; }
+  .search-btn:disabled { opacity: .4; cursor: not-allowed; }
+
+  /* ── Chunk browser ───────────────────────────────────────────── */
+  .chunk-tabs { display: flex; gap: 4px; margin-bottom: 20px; border-bottom: 1px solid var(--border); }
+  .chunk-tab { padding: 10px 20px; cursor: pointer; border-bottom: 2px solid transparent; font-size: 13px; font-weight: 500; color: var(--muted); transition: all .15s; }
+  .chunk-tab:hover { color: var(--text); }
+  .chunk-tab.active { color: var(--text); border-bottom-color: var(--accent); }
+  .chunk-list-scroll { max-height: 600px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+  .chunk-card { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 14px; }
+  .chunk-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .chunk-id { font-size: 11px; font-weight: 700; font-family: monospace; color: var(--accent); }
+  .chunk-stats { display: flex; gap: 10px; font-size: 11px; color: var(--muted); }
+  .chunk-text { font-size: 12px; color: var(--muted); line-height: 1.5; max-height: 80px; overflow: hidden; white-space: pre-wrap; word-break: break-word; }
+  .chunk-expanded { max-height: none; }
+
+  /* ── Loading / empty states ──────────────────────────────────── */
+  .loading { display: flex; align-items: center; gap: 10px; color: var(--muted); padding: 40px; justify-content: center; }
+  .spinner { width: 20px; height: 20px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .empty { text-align: center; color: var(--muted); padding: 40px; }
+
+  /* ── Scrollbar ───────────────────────────────────────────────── */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <!-- ── Sidebar ── -->
+  <nav>
+    <div class="nav-logo">
+      <h1>RAG Chunking<br>Explorer</h1>
+      <p>all-MiniLM-L6-v2 · 384d</p>
+    </div>
+    <div class="nav-item active" onclick="showPage('dashboard')" id="nav-dashboard">
+      <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h7"/></svg>
+      Dashboard
+    </div>
+    <div class="nav-item" onclick="showPage('comparison')" id="nav-comparison">
+      <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+      Comparison
+    </div>
+    <div class="nav-item" onclick="showPage('queries')" id="nav-queries">
+      <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16l-4-4m0 0l4-4m-4 4h16"/></svg>
+      Query Explorer
+    </div>
+    <div class="nav-item" onclick="showPage('search')" id="nav-search">
+      <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+      Live Search
+    </div>
+    <div class="nav-item" onclick="showPage('chunks')" id="nav-chunks">
+      <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+      Chunk Browser
+    </div>
+  </nav>
+
+  <!-- ── Main ── -->
+  <main>
+
+    <!-- DASHBOARD -->
+    <div class="page active" id="page-dashboard">
+      <div class="page-header">
+        <h2>Dashboard</h2>
+        <p>RAG pipeline overview — Choosing a Chunking Strategy (IntelliForge Research, 16 pages)</p>
+      </div>
+      <div class="stat-grid" id="stat-grid">
+        <div class="loading"><div class="spinner"></div> Loading…</div>
+      </div>
+      <div class="strategy-grid" id="strategy-summary">
+        <div class="loading"><div class="spinner"></div></div>
+      </div>
+      <div class="card">
+        <div class="card-title">About this experiment</div>
+        <p style="color:var(--muted);font-size:13px;line-height:1.7;">
+          Three chunking strategies were applied to a 16-page PDF and evaluated against 10 semantic queries.
+          Embeddings were generated using <strong style="color:var(--text)">all-MiniLM-L6-v2</strong> (384 dimensions, local CPU inference).
+          Vector similarity search runs on <strong style="color:var(--text)">Supabase pgvector</strong> with an HNSW index (m=16, ef_construction=64).
+          Retrieval quality is measured by <strong style="color:var(--text)">HR@3</strong> (hit-rate at 3) as the primary metric.
+        </p>
+      </div>
+    </div>
+
+    <!-- COMPARISON TABLE -->
+    <div class="page" id="page-comparison">
+      <div class="page-header">
+        <h2>Comparison Table</h2>
+        <p>HR@3, MRR@5, and top-1 cosine similarity for all 10 queries × 3 strategies</p>
+      </div>
+      <div class="card">
+        <div class="table-wrap" id="comparison-table">
+          <div class="loading"><div class="spinner"></div> Loading…</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- QUERY EXPLORER -->
+    <div class="page" id="page-queries">
+      <div class="page-header">
+        <h2>Query Explorer</h2>
+        <p>Click a query to see top-5 retrieved chunks per strategy</p>
+      </div>
+      <div class="query-grid">
+        <div class="query-list" id="query-list">
+          <div class="loading"><div class="spinner"></div></div>
+        </div>
+        <div class="result-panel" id="result-panel">
+          <div class="empty">← Select a query to explore results</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- LIVE SEARCH -->
+    <div class="page" id="page-search">
+      <div class="page-header">
+        <h2>Live Search</h2>
+        <p>Type any question — embeddings are generated locally and matched against all 3 strategies in real time</p>
+      </div>
+      <div class="search-box">
+        <input class="search-input" id="search-input" placeholder="e.g. What is the recommended overlap percentage?" onkeydown="if(event.key==='Enter') runSearch()" />
+        <button class="search-btn" id="search-btn" onclick="runSearch()">Search</button>
+      </div>
+      <div id="search-results"></div>
+    </div>
+
+    <!-- CHUNK BROWSER -->
+    <div class="page" id="page-chunks">
+      <div class="page-header">
+        <h2>Chunk Browser</h2>
+        <p>Browse all 200 chunks produced by each strategy</p>
+      </div>
+      <div class="chunk-tabs">
+        <div class="chunk-tab active" onclick="showChunkTab('fixed')" id="tab-fixed">Fixed-size <span id="count-fixed"></span></div>
+        <div class="chunk-tab" onclick="showChunkTab('structural')" id="tab-structural">Structural <span id="count-structural"></span></div>
+        <div class="chunk-tab" onclick="showChunkTab('semantic')" id="tab-semantic">Semantic <span id="count-semantic"></span></div>
+      </div>
+      <div class="card">
+        <div class="chunk-list-scroll" id="chunk-list">
+          <div class="loading"><div class="spinner"></div> Loading…</div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+// ── State ────────────────────────────────────────────────────────
+let state = { results: null, chunks: null, activeQuery: null, activeChunkTab: 'fixed' };
+
+// ── Navigation ───────────────────────────────────────────────────
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  document.getElementById('nav-' + name).classList.add('active');
+  if (name === 'comparison' && !state.results) loadResults();
+  if (name === 'queries' && !state.results) loadResults();
+  if (name === 'chunks' && !state.chunks) loadChunks();
+  if (name === 'dashboard' && !state.results) loadAll();
+}
+
+// ── API helpers ──────────────────────────────────────────────────
+async function api(path) {
+  const r = await fetch(path);
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+// ── Load all data for dashboard ──────────────────────────────────
+async function loadAll() {
+  try {
+    const [results, stats] = await Promise.all([api('/api/results'), api('/api/stats')]);
+    state.results = results;
+    renderStatGrid(stats, results);
+    renderStrategySummary(results.summary);
+  } catch(e) { document.getElementById('stat-grid').innerHTML = `<div class="empty">Error: ${e.message}</div>`; }
+}
+
+function renderStatGrid(stats, results) {
+  const totalChunks = Object.values(stats.chunks || {}).reduce((a,b) => a + b.count, 0);
+  const bestStrategy = Object.entries(results.summary)
+    .sort((a,b) => (b[1].avg_hr3||0) - (a[1].avg_hr3||0))[0];
+
+  document.getElementById('stat-grid').innerHTML = `
+    <div class="stat-card">
+      <div class="stat-label">Total Chunks</div>
+      <div class="stat-value" style="color:var(--accent)">${totalChunks}</div>
+      <div class="stat-sub">across 3 strategies</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Queries Tested</div>
+      <div class="stat-value" style="color:var(--green)">${results.queries.length}</div>
+      <div class="stat-sub">10 distinct types</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Best HR@3</div>
+      <div class="stat-value" style="color:var(--amber)">${bestStrategy ? (bestStrategy[1].avg_hr3*100).toFixed(0)+'%' : '—'}</div>
+      <div class="stat-sub">${bestStrategy ? bestStrategy[0] : ''} strategy</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Embedding Model</div>
+      <div class="stat-value" style="font-size:14px;color:var(--text);margin-top:10px">${stats.model}</div>
+      <div class="stat-sub">${stats.embedding_dim} dimensions</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Fixed Chunks</div>
+      <div class="stat-value" style="color:#818cf8">${stats.chunks?.fixed?.count || '—'}</div>
+      <div class="stat-sub">avg ${stats.chunks?.fixed?.avg_tokens || '—'} tokens</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Structural Chunks</div>
+      <div class="stat-value" style="color:#4ade80">${stats.chunks?.structural?.count || '—'}</div>
+      <div class="stat-sub">avg ${stats.chunks?.structural?.avg_tokens || '—'} tokens</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Semantic Chunks</div>
+      <div class="stat-value" style="color:#fcd34d">${stats.chunks?.semantic?.count || '—'}</div>
+      <div class="stat-sub">avg ${stats.chunks?.semantic?.avg_tokens || '—'} tokens</div>
+    </div>
+  `;
+}
+
+function renderStrategySummary(summary) {
+  const labels = { fixed: 'Fixed-size', structural: 'Structural', semantic: 'Semantic' };
+  const descs = {
+    fixed: '512 tokens · 64-token overlap',
+    structural: '400-token target · paragraph fallback',
+    semantic: '5-sentence window · stride 2'
+  };
+  const css = { fixed: 'fixed', structural: 'struct', semantic: 'semantic' };
+
+  document.getElementById('strategy-summary').innerHTML = ['fixed','structural','semantic'].map(s => {
+    const d = summary[s] || {};
+    const hr3pct = ((d.avg_hr3||0)*100).toFixed(0);
+    const cosPct = ((d.avg_cosine||0)*100).toFixed(0);
+    return `
+      <div class="strategy-card ${css[s]}">
+        <div class="strategy-name">${labels[s]}</div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:14px">${descs[s]}</div>
+        <div class="metric-row">
+          <span class="metric-label">HR@3 (primary)</span>
+          <span class="metric-val">${hr3pct}%</span>
+        </div>
+        <div class="progress-bar"><div class="progress-fill" style="width:${hr3pct}%"></div></div>
+        <div class="metric-row" style="margin-top:12px">
+          <span class="metric-label">Avg MRR@5</span>
+          <span class="metric-val">${((d.avg_mrr5||0)).toFixed(3)}</span>
+        </div>
+        <div class="metric-row" style="margin-top:8px">
+          <span class="metric-label">Avg Top-1 Cosine</span>
+          <span class="metric-val">${((d.avg_cosine||0)).toFixed(4)}</span>
+        </div>
+        <div class="progress-bar"><div class="progress-fill" style="width:${cosPct}%"></div></div>
+      </div>`;
+  }).join('');
+}
+
+// ── Comparison table ─────────────────────────────────────────────
+async function loadResults() {
+  if (state.results) { renderComparisonTable(); renderQueryList(); return; }
+  try {
+    state.results = await api('/api/results');
+    renderComparisonTable();
+    renderQueryList();
+  } catch(e) {
+    document.getElementById('comparison-table').innerHTML = `<div class="empty">Error: ${e.message}</div>`;
+  }
+}
+
+function cosineBar(val, color) {
+  const pct = (val * 100).toFixed(0);
+  return `<div class="cosine-bar">
+    <div class="cosine-track"><div class="cosine-fill" style="width:${pct}%;background:${color}"></div></div>
+    <span style="font-size:11px;min-width:42px;text-align:right">${val.toFixed(4)}</span>
+  </div>`;
+}
+
+function renderComparisonTable() {
+  const { queries, summary } = state.results;
+  const winnerClass = { fixed:'winner-fixed', structural:'winner-struct', semantic:'winner-semantic' };
+
+  const rows = queries.map(q => {
+    const f = q.strategies.fixed;
+    const s = q.strategies.structural;
+    const sem = q.strategies.semantic;
+    return `<tr>
+      <td><strong>${q.id}</strong></td>
+      <td style="max-width:220px;font-size:12px;line-height:1.4">${q.query}</td>
+      <td style="color:var(--muted)">${q.gold_page || '—'}</td>
+      <td class="${f.hr3 === 1 ? 'hit-1' : 'hit-0'}">${f.hr3 !== null ? f.hr3 : '—'}</td>
+      <td class="${s.hr3 === 1 ? 'hit-1' : 'hit-0'}">${s.hr3 !== null ? s.hr3 : '—'}</td>
+      <td class="${sem.hr3 === 1 ? 'hit-1' : 'hit-0'}">${sem.hr3 !== null ? sem.hr3 : '—'}</td>
+      <td>${f.top1_cosine !== null ? cosineBar(f.top1_cosine,'#6366f1') : '—'}</td>
+      <td>${s.top1_cosine !== null ? cosineBar(s.top1_cosine,'#22c55e') : '—'}</td>
+      <td>${sem.top1_cosine !== null ? cosineBar(sem.top1_cosine,'#f59e0b') : '—'}</td>
+    </tr>`;
+  }).join('');
+
+  const avgRow = `<tr class="avg-row">
+    <td colspan="3"><strong>AVG</strong></td>
+    <td class="${summary.fixed.avg_hr3 > 0 ? 'hit-1' : 'hit-0'}">${summary.fixed.avg_hr3?.toFixed(2) || '—'}</td>
+    <td class="${summary.structural.avg_hr3 > 0 ? 'hit-1' : 'hit-0'}">${summary.structural.avg_hr3?.toFixed(2) || '—'}</td>
+    <td class="${summary.semantic.avg_hr3 > 0 ? 'hit-1' : 'hit-0'}">${summary.semantic.avg_hr3?.toFixed(2) || '—'}</td>
+    <td>${cosineBar(summary.fixed.avg_cosine||0,'#6366f1')}</td>
+    <td>${cosineBar(summary.structural.avg_cosine||0,'#22c55e')}</td>
+    <td>${cosineBar(summary.semantic.avg_cosine||0,'#f59e0b')}</td>
+  </tr>`;
+
+  document.getElementById('comparison-table').innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th><th>Query</th><th>Gold Pg</th>
+          <th><span class="badge badge-fixed">Fixed</span> HR@3</th>
+          <th><span class="badge badge-struct">Struct</span> HR@3</th>
+          <th><span class="badge badge-semantic">Semantic</span> HR@3</th>
+          <th><span class="badge badge-fixed">Fixed</span> Cosine</th>
+          <th><span class="badge badge-struct">Struct</span> Cosine</th>
+          <th><span class="badge badge-semantic">Semantic</span> Cosine</th>
+        </tr>
+      </thead>
+      <tbody>${rows}${avgRow}</tbody>
+    </table>`;
+}
+
+// ── Query Explorer ───────────────────────────────────────────────
+function renderQueryList() {
+  const { queries } = state.results;
+  document.getElementById('query-list').innerHTML = queries.map(q => `
+    <div class="query-item" id="qi-${q.id}" onclick="selectQuery('${q.id}')">
+      <div class="query-id">${q.id}</div>
+      <div class="query-text">${q.query}</div>
+      <div class="query-type">${q.type}</div>
+    </div>`).join('');
+}
+
+function selectQuery(id) {
+  state.activeQuery = id;
+  document.querySelectorAll('.query-item').forEach(el => el.classList.remove('active'));
+  document.getElementById('qi-' + id)?.classList.add('active');
+
+  const q = state.results.queries.find(x => x.id === id);
+  if (!q) return;
+
+  const stratConfigs = [
+    { key:'fixed', label:'Fixed-size', color:'#6366f1', badge:'badge-fixed' },
+    { key:'structural', label:'Structural', color:'#22c55e', badge:'badge-struct' },
+    { key:'semantic', label:'Semantic', color:'#f59e0b', badge:'badge-semantic' },
+  ];
+
+  const sections = stratConfigs.map(sc => {
+    const strat = q.strategies[sc.key];
+    const hr3 = strat.hr3 !== null ? `<span style="margin-left:8px;font-size:11px;color:${strat.hr3===1?'#22c55e':'#ef4444'}">${strat.hr3===1?'✓ HR@3 hit':'✗ HR@3 miss'}</span>` : '';
+    const chunks = (strat.top5 || []).map(r => `
+      <div class="result-chunk">
+        <div class="result-chunk-meta">
+          <div class="rank-badge rank-${r.rank}">${r.rank}</div>
+          <span class="score-pill">${r.cosine_similarity.toFixed(4)}</span>
+          <span class="page-pill">p.${r.source_page}</span>
+          <span style="font-size:10px;color:var(--muted);font-family:monospace">${r.chunk_id}</span>
+        </div>
+        <div class="chunk-preview">${r.preview.replace(/\s+/g,' ').trim()}</div>
+      </div>`).join('');
+
+    return `
+      <div class="result-section">
+        <div class="result-section-header">
+          <span class="badge ${sc.badge}">${sc.label}</span>
+          ${hr3}
+          <span style="margin-left:auto;font-size:11px;color:var(--muted)">top-1: ${strat.top1_cosine?.toFixed(4) || '—'}</span>
+        </div>
+        <div class="result-chunks">${chunks || '<div class="empty" style="padding:16px">No results</div>'}</div>
+      </div>`;
+  }).join('<hr style="border-color:var(--border);margin:12px 0">');
+
+  document.getElementById('result-panel').innerHTML = `
+    <div class="card" style="margin-bottom:0">
+      <div style="font-size:13px;font-weight:600;margin-bottom:4px">${q.id} · <span style="color:var(--muted);font-weight:400">${q.type}</span></div>
+      <div style="font-size:14px;margin-bottom:20px;line-height:1.5">${q.query}</div>
+      ${sections}
+    </div>`;
+}
+
+// ── Live Search ──────────────────────────────────────────────────
+async function runSearch() {
+  const input = document.getElementById('search-input');
+  const btn = document.getElementById('search-btn');
+  const q = input.value.trim();
+  if (!q) return;
+
+  btn.disabled = true;
+  btn.textContent = 'Searching…';
+  document.getElementById('search-results').innerHTML = '<div class="loading"><div class="spinner"></div> Embedding query and searching…</div>';
+
+  try {
+    const data = await fetch('/api/query', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: q, top_k: 5 }),
+    }).then(r => { if (!r.ok) return r.text().then(t => { throw new Error(t) }); return r.json(); });
+
+    const stratConfigs = [
+      { key:'fixed', label:'Fixed-size', color:'#6366f1', badge:'badge-fixed' },
+      { key:'structural', label:'Structural', color:'#22c55e', badge:'badge-struct' },
+      { key:'semantic', label:'Semantic', color:'#f59e0b', badge:'badge-semantic' },
+    ];
+
+    const html = stratConfigs.map(sc => {
+      const results = data.results[sc.key] || [];
+      const chunks = results.map(r => `
+        <div class="result-chunk">
+          <div class="result-chunk-meta">
+            <div class="rank-badge rank-${r.rank}">${r.rank}</div>
+            <span class="score-pill">${r.cosine_similarity.toFixed(4)}</span>
+            <span class="page-pill">p.${r.source_page}</span>
+            <span style="font-size:10px;color:var(--muted);font-family:monospace">${r.chunk_id}</span>
+          </div>
+          <div class="chunk-preview">${r.preview.replace(/\s+/g,' ').trim()}</div>
+        </div>`).join('');
+
+      return `
+        <div class="card" style="margin-bottom:16px">
+          <div class="result-section-header" style="margin-bottom:12px">
+            <span class="badge ${sc.badge}">${sc.label}</span>
+            <span style="margin-left:auto;font-size:11px;color:var(--muted)">top-1: ${results[0]?.cosine_similarity?.toFixed(4) || '—'}</span>
+          </div>
+          <div class="result-chunks">${chunks}</div>
+        </div>`;
+    }).join('');
+
+    document.getElementById('search-results').innerHTML = html;
+
+  } catch(e) {
+    const msg = e.message.includes('500') ? 'Live search requires Supabase connection. Make sure the server is running with valid credentials.' : e.message;
+    document.getElementById('search-results').innerHTML = `<div class="card"><p style="color:var(--red)">${msg}</p></div>`;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Search';
+  }
+}
+
+// ── Chunk Browser ────────────────────────────────────────────────
+async function loadChunks() {
+  try {
+    const data = await api('/api/chunks');
+    state.chunks = data;
+    ['fixed','structural','semantic'].forEach(s => {
+      document.getElementById('count-' + s).textContent = `(${data.stats[s]?.count || 0})`;
+    });
+    renderChunkList('fixed');
+  } catch(e) {
+    document.getElementById('chunk-list').innerHTML = `<div class="empty">Error: ${e.message}</div>`;
+  }
+}
+
+function showChunkTab(strategy) {
+  state.activeChunkTab = strategy;
+  document.querySelectorAll('.chunk-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-' + strategy).classList.add('active');
+  if (state.chunks) renderChunkList(strategy);
+}
+
+function renderChunkList(strategy) {
+  const chunks = state.chunks?.chunks?.[strategy] || [];
+  if (!chunks.length) { document.getElementById('chunk-list').innerHTML = '<div class="empty">No chunks</div>'; return; }
+
+  document.getElementById('chunk-list').innerHTML = chunks.map((c, i) => `
+    <div class="chunk-card" id="cc-${i}" onclick="toggleChunk(${i})">
+      <div class="chunk-card-header">
+        <span class="chunk-id">${c.chunk_id}</span>
+        <div class="chunk-stats">
+          <span>p.${c.source_page}</span>
+          <span>${c.token_count} tokens</span>
+          <span>${c.char_start}–${c.char_end}</span>
+        </div>
+      </div>
+      <div class="chunk-text" id="ct-${i}">${c.preview.replace(/\s+/g,' ').trim()}</div>
+    </div>`).join('');
+}
+
+function toggleChunk(i) {
+  const el = document.getElementById('ct-' + i);
+  el.classList.toggle('chunk-expanded');
+}
+
+// ── Boot ─────────────────────────────────────────────────────────
+loadAll();
+</script>
+</body>
+</html>

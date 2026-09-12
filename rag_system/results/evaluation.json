@@ -1,0 +1,272 @@
+{
+  "Q1": {
+    "query": "What is the definition of boundary policy in chunking?",
+    "type": "single-fact / definition",
+    "gold_page": 3,
+    "gold_char_start": 11120,
+    "gold_char_end": 14100,
+    "strategies": {
+      "fixed": {
+        "hr3": 0,
+        "mrr5": 0.0,
+        "top1_cosine": 0.474681,
+        "first_relevant_rank": null
+      },
+      "structural": {
+        "hr3": 1,
+        "mrr5": 1.0,
+        "top1_cosine": 0.618528,
+        "first_relevant_rank": 1
+      },
+      "semantic": {
+        "hr3": 0,
+        "mrr5": 0.0,
+        "top1_cosine": 0.696685,
+        "first_relevant_rank": null
+      }
+    }
+  },
+  "Q2": {
+    "query": "What are the three forces that govern chunking decisions?",
+    "type": "multi-part fact",
+    "gold_page": 3,
+    "gold_char_start": 11120,
+    "gold_char_end": 14100,
+    "strategies": {
+      "fixed": {
+        "hr3": 0,
+        "mrr5": 0.0,
+        "top1_cosine": 0.476113,
+        "first_relevant_rank": null
+      },
+      "structural": {
+        "hr3": 1,
+        "mrr5": 0.5,
+        "top1_cosine": 0.572808,
+        "first_relevant_rank": 2
+      },
+      "semantic": {
+        "hr3": 0,
+        "mrr5": 0.0,
+        "top1_cosine": 0.620867,
+        "first_relevant_rank": null
+      }
+    }
+  },
+  "Q3": {
+    "query": "How does fixed-size chunking differ from recursive separator splitting?",
+    "type": "contrastive",
+    "gold_page": 5,
+    "gold_char_start": 23056,
+    "gold_char_end": 25913,
+    "strategies": {
+      "fixed": {
+        "hr3": 0,
+        "mrr5": 0.0,
+        "top1_cosine": 0.577101,
+        "first_relevant_rank": null
+      },
+      "structural": {
+        "hr3": 0,
+        "mrr5": 0.0,
+        "top1_cosine": 0.573633,
+        "first_relevant_rank": null
+      },
+      "semantic": {
+        "hr3": 0,
+        "mrr5": 0.0,
+        "top1_cosine": 0.643386,
+        "first_relevant_rank": null
+      }
+    }
+  },
+  "Q4": {
+    "query": "What is the stated purpose of assembly policy in a RAG pipeline?",
+    "type": "context-dependent",
+    "gold_page": 3,
+    "gold_char_start": 11120,
+    "gold_char_end": 14100,
+    "strategies": {
+      "fixed": {
+        "hr3": 0,
+        "mrr5": 0.0,
+        "top1_cosine": 0.491213,
+        "first_relevant_rank": null
+      },
+      "structural": {
+        "hr3": 1,
+        "mrr5": 1.0,
+        "top1_cosine": 0.419761,
+        "first_relevant_rank": 1
+      },
+      "semantic": {
+        "hr3": 0,
+        "mrr5": 0.0,
+        "top1_cosine": 0.478938,
+        "first_relevant_rank": null
+      }
+    }
+  },
+  "Q5": {
+    "query": "What percentage reduction in top-20 retrieval failure rate did Anthropic achieve by combining contextual retrieval, hybrid BM25 and reranking?",
+    "type": "single precise fact",
+    "gold_page": 3,
+    "gold_char_start": 15622,
+    "gold_char_end": 19729,
+    "strategies": {
+      "fixed": {
+        "hr3": 1,
+        "mrr5": 1.0,
+        "top1_cosine": 0.450819,
+        "first_relevant_rank": 1
+      },
+      "structural": {
+        "hr3": 0,
+        "mrr5": 0.0,
+        "top1_cosine": 0.57976,
+        "first_relevant_rank": null
+      },
+      "semantic": {
+        "hr3": 0,
+        "mrr5": 0.0,
+        "top1_cosine": 0.58639,
+        "first_relevant_rank": null
+      }
+    }
+  },
+  "Q6": {
+    "query": "What step follows the structure question in the five-question decision path?",
+    "type": "sequential / procedural",
+    "gold_page": 7,
+    "gold_char_start": 35909,
+    "gold_char_end": 38625,
+    "strategies": {
+      "fixed": {
+        "hr3": 0,
+        "mrr5": 0.2,
+        "top1_cosine": 0.408805,
+        "first_relevant_rank": 5
+      },
+      "structural": {
+        "hr3": 0,
+        "mrr5": 0.25,
+        "top1_cosine": 0.353754,
+        "first_relevant_rank": 4
+      },
+      "semantic": {
+        "hr3": 0,
+        "mrr5": 0.0,
+        "top1_cosine": 0.700597,
+        "first_relevant_rank": null
+      }
+    }
+  },
+  "Q7": {
+    "query": "What limitations or caveats does the document mention for semantic chunking?",
+    "type": "synthesis across sentences",
+    "gold_page": 5,
+    "gold_char_start": 23056,
+    "gold_char_end": 25913,
+    "strategies": {
+      "fixed": {
+        "hr3": 0,
+        "mrr5": 0.0,
+        "top1_cosine": 0.667905,
+        "first_relevant_rank": null
+      },
+      "structural": {
+        "hr3": 0,
+        "mrr5": 0.0,
+        "top1_cosine": 0.683931,
+        "first_relevant_rank": null
+      },
+      "semantic": {
+        "hr3": 0,
+        "mrr5": 0.0,
+        "top1_cosine": 0.702616,
+        "first_relevant_rank": null
+      }
+    }
+  },
+  "Q8": {
+    "query": "What does the document recommend as the starting configuration for policy and compliance manuals?",
+    "type": "recommendation retrieval",
+    "gold_page": 8,
+    "gold_char_start": 43344,
+    "gold_char_end": 52000,
+    "strategies": {
+      "fixed": {
+        "hr3": 0,
+        "mrr5": 0.0,
+        "top1_cosine": 0.389273,
+        "first_relevant_rank": null
+      },
+      "structural": {
+        "hr3": 0,
+        "mrr5": 0.0,
+        "top1_cosine": 0.410954,
+        "first_relevant_rank": null
+      },
+      "semantic": {
+        "hr3": 0,
+        "mrr5": 0.0,
+        "top1_cosine": 0.473594,
+        "first_relevant_rank": null
+      }
+    }
+  },
+  "Q9": {
+    "query": "What is the relationship between chunk size and the embedding model's sequence limit?",
+    "type": "cross-section synthesis",
+    "gold_page": 10,
+    "gold_char_start": 56000,
+    "gold_char_end": 62000,
+    "strategies": {
+      "fixed": {
+        "hr3": 0,
+        "mrr5": 0.0,
+        "top1_cosine": 0.61177,
+        "first_relevant_rank": null
+      },
+      "structural": {
+        "hr3": 0,
+        "mrr5": 0.0,
+        "top1_cosine": 0.524176,
+        "first_relevant_rank": null
+      },
+      "semantic": {
+        "hr3": 0,
+        "mrr5": 0.0,
+        "top1_cosine": 0.668767,
+        "first_relevant_rank": null
+      }
+    }
+  },
+  "Q10": {
+    "query": "What evidence does the document give to support the claim that ordering beats splitting?",
+    "type": "evidence retrieval",
+    "gold_page": 3,
+    "gold_char_start": 15622,
+    "gold_char_end": 19729,
+    "strategies": {
+      "fixed": {
+        "hr3": 1,
+        "mrr5": 1.0,
+        "top1_cosine": 0.366727,
+        "first_relevant_rank": 1
+      },
+      "structural": {
+        "hr3": 0,
+        "mrr5": 0.25,
+        "top1_cosine": 0.33893,
+        "first_relevant_rank": 4
+      },
+      "semantic": {
+        "hr3": 1,
+        "mrr5": 1.0,
+        "top1_cosine": 0.489646,
+        "first_relevant_rank": 1
+      }
+    }
+  }
+}

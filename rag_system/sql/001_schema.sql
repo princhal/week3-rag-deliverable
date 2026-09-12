@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS document_chunks (
     char_end        INTEGER         NOT NULL,           -- offset in cleaned full-text (exclusive)
     token_count     SMALLINT        NOT NULL,           -- tiktoken cl100k_base count
     chunk_text      TEXT            NOT NULL,           -- raw chunk text
-    embedding       VECTOR(1536)    NOT NULL,           -- text-embedding-3-small output
+    embedding       VECTOR(768)     NOT NULL,           -- text-embedding-004 (Google Gemini) output
     created_at      TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
 
     CONSTRAINT char_order CHECK (char_end > char_start),
