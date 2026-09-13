@@ -21,6 +21,10 @@ RAG_SRC = RAG_DIR / "src"
 if str(RAG_SRC) not in sys.path:
     sys.path.insert(0, str(RAG_DIR))
 
+BACKEND_DIR = Path(__file__).resolve().parent
+if str(BACKEND_DIR) not in sys.path:
+    sys.path.insert(0, str(BACKEND_DIR))
+
 app = FastAPI(title="RAG Demo API", version="1.0.0")
 
 app.add_middleware(
