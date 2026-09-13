@@ -71,9 +71,9 @@ export default function Home() {
       if (!res.ok) throw new Error("Query failed");
       const json: QueryResponse = await res.json();
       setQueryResult(json);
-    } catch (err: any) {
+    } catch (err: unknown) {
       setQueryResult(null);
-      setError(err.message);
+      setError(err instanceof Error ? err.message : "Query failed");
     } finally {
       setQuerying(false);
     }
@@ -158,7 +158,7 @@ export default function Home() {
 
           {queryResult && (
             <div className="space-y-4">
-              <p className="text-sm text-white/70 break-words">"{queryResult.query}"</p>
+              <p className="text-sm text-white/70 break-words">&quot;{queryResult.query}&quot;</p>
               {STRATEGIES.map((strategy) => (
                 <div key={strategy} className="rounded-lg bg-white/5 border border-white/10 p-3">
                   <h4 className="text-white/80 font-medium text-sm mb-2 capitalize">{strategy}</h4>

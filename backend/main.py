@@ -204,7 +204,10 @@ async def run_live_query(req: QueryRequest):
             raise HTTPException(status_code=500, detail="Supabase credentials not configured")
 
         client = create_client(url, key)
-        query_vector = embed_query(req.query)
+        try:
+            query_vector = embed_query(req.query)
+        except Exception:
+            return JSONResponse({"query": req.query, "results": {strategy: [] for strategy in ["fixed", "structural", "semantic"]}})
 
         results = {}
         for strategy in ["fixed", "structural", "semantic"]:
