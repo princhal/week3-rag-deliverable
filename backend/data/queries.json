@@ -1,0 +1,102 @@
+[
+  {
+    "id": "Q1",
+    "query": "What is the definition of boundary policy in chunking?",
+    "type": "single-fact / definition",
+    "stress_target": "fixed",
+    "gold_page": 3,
+    "gold_char_start": 11120,
+    "gold_char_end": 14100,
+    "notes": "Section 01, structural_p03_002 — defines boundary policy directly"
+  },
+  {
+    "id": "Q2",
+    "query": "What are the three forces that govern chunking decisions?",
+    "type": "multi-part fact",
+    "stress_target": "structural",
+    "gold_page": 3,
+    "gold_char_start": 11120,
+    "gold_char_end": 14100,
+    "notes": "Section 01 — DOC, QRY, BGT forces defined in same chunk"
+  },
+  {
+    "id": "Q3",
+    "query": "How does fixed-size chunking differ from recursive separator splitting?",
+    "type": "contrastive",
+    "stress_target": "all",
+    "gold_page": 5,
+    "gold_char_start": 23056,
+    "gold_char_end": 25913,
+    "notes": "Section 02 — structural_p05_006 contains both FIX and REC side by side"
+  },
+  {
+    "id": "Q4",
+    "query": "What is the stated purpose of assembly policy in a RAG pipeline?",
+    "type": "context-dependent",
+    "stress_target": "structural",
+    "gold_page": 3,
+    "gold_char_start": 11120,
+    "gold_char_end": 14100,
+    "notes": "Section 01 — assembly policy defined alongside boundary policy"
+  },
+  {
+    "id": "Q5",
+    "query": "What percentage reduction in top-20 retrieval failure rate did Anthropic achieve by combining contextual retrieval, hybrid BM25 and reranking?",
+    "type": "single precise fact",
+    "stress_target": "fixed",
+    "gold_page": 3,
+    "gold_char_start": 15622,
+    "gold_char_end": 19729,
+    "notes": "Section 01 — fixed_p03_003 contains the 67% figure"
+  },
+  {
+    "id": "Q6",
+    "query": "What step follows the structure question in the five-question decision path?",
+    "type": "sequential / procedural",
+    "stress_target": "semantic",
+    "gold_page": 7,
+    "gold_char_start": 35909,
+    "gold_char_end": 38625,
+    "notes": "Section 03 — structural_p07_010 contains Q1 Structure followed by Q2 Answer Shape"
+  },
+  {
+    "id": "Q7",
+    "query": "What limitations or caveats does the document mention for semantic chunking?",
+    "type": "synthesis across sentences",
+    "stress_target": "semantic",
+    "gold_page": 5,
+    "gold_char_start": 23056,
+    "gold_char_end": 25913,
+    "notes": "Section 02 — inconsistent gains, real embedding cost at index time"
+  },
+  {
+    "id": "Q8",
+    "query": "What does the document recommend as the starting configuration for policy and compliance manuals?",
+    "type": "recommendation retrieval",
+    "stress_target": "structural",
+    "gold_page": 8,
+    "gold_char_start": 43344,
+    "gold_char_end": 52000,
+    "notes": "Section 04 scenario playbook — policy manuals row"
+  },
+  {
+    "id": "Q9",
+    "query": "What is the relationship between chunk size and the embedding model's sequence limit?",
+    "type": "cross-section synthesis",
+    "stress_target": "all",
+    "gold_page": 10,
+    "gold_char_start": 56000,
+    "gold_char_end": 62000,
+    "notes": "Section 05 — silent truncation, size bounded by model limit"
+  },
+  {
+    "id": "Q10",
+    "query": "What evidence does the document give to support the claim that ordering beats splitting?",
+    "type": "evidence retrieval",
+    "stress_target": "structural",
+    "gold_page": 3,
+    "gold_char_start": 15622,
+    "gold_char_end": 19729,
+    "notes": "Section 01 — Jina late chunking study cited"
+  }
+]

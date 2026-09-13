@@ -1,0 +1,17 @@
+{
+  "total_chunks": 200,
+  "embedded": 200,
+  "failed_batches": [],
+  "batches": [
+    {
+      "batch": 0,
+      "count": 100,
+      "strategy_sample": "fixed"
+    },
+    {
+      "batch": 1,
+      "count": 100,
+      "strategy_sample": "semantic"
+    }
+  ]
+}

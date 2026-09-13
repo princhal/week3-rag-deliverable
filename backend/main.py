@@ -10,18 +10,25 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
+BACKEND_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = BACKEND_DIR.parent
 RAG_DIR = PROJECT_ROOT / "rag_system"
+
 DATA_DIR = RAG_DIR / "data"
 RESULTS_DIR = RAG_DIR / "results"
+if not DATA_DIR.exists():
+    DATA_DIR = BACKEND_DIR / "data"
+if not RESULTS_DIR.exists():
+    RESULTS_DIR = BACKEND_DIR / "results"
 
-load_dotenv(RAG_DIR / ".env")
+_env_path = RAG_DIR / ".env"
+if _env_path.exists():
+    load_dotenv(_env_path)
 
 RAG_SRC = RAG_DIR / "src"
 if str(RAG_SRC) not in sys.path:
     sys.path.insert(0, str(RAG_DIR))
 
-BACKEND_DIR = Path(__file__).resolve().parent
 if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
