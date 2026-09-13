@@ -24,3 +24,5 @@ frontend/.env*.local
 
 # Logs
 *.log
+.vercel
+.env*
