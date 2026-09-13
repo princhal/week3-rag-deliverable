@@ -70,6 +70,10 @@ jobs:
       - validate-frontend
       - validate-backend
     runs-on: ubuntu-latest
+    env:
+      VERCEL_ORG_ID: team_AeCM1I5QOPEQQ6nyS5dLRb8w
+      VERCEL_FRONTEND_PROJECT_ID: prj_KenRkCWBRSfVp7JuXS5zxiOPGLe3
+      VERCEL_BACKEND_PROJECT_ID: prj_EbGc1RfFcnuP1FaaYAkljgg9k2TS
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -82,16 +86,17 @@ jobs:
       - name: Install Vercel CLI
         run: npm install --global vercel@59.16.0
 
+      - name: Check Vercel token
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: test -n "$VERCEL_TOKEN"
+
       - name: Deploy frontend
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_FRONTEND_PROJECT_ID: ${{ secrets.VERCEL_FRONTEND_PROJECT_ID }}
         run: vercel deploy --cwd frontend --prod --yes --token "$VERCEL_TOKEN" --scope "$VERCEL_ORG_ID" --project "$VERCEL_FRONTEND_PROJECT_ID"
 
       - name: Deploy backend
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_BACKEND_PROJECT_ID: ${{ secrets.VERCEL_BACKEND_PROJECT_ID }}
         run: vercel deploy --cwd backend --prod --yes --token "$VERCEL_TOKEN" --scope "$VERCEL_ORG_ID" --project "$VERCEL_BACKEND_PROJECT_ID"

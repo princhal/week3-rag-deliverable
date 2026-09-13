@@ -29,12 +29,9 @@ Then open your browser:
 
 The workflow in `.github/workflows/ci-cd.yml` runs frontend lint/build and backend Python validation on pull requests and pushes. A push to `main` deploys both services to Vercel after validation passes.
 
-Add these repository secrets in GitHub:
+Add this repository secret in GitHub:
 
 - `VERCEL_TOKEN`
-- `VERCEL_ORG_ID` (the Vercel team slug or ID)
-- `VERCEL_FRONTEND_PROJECT_ID`
-- `VERCEL_BACKEND_PROJECT_ID`
 
 Create a Vercel token from the Vercel account settings. Project IDs are available with `vercel project inspect <project-name>`.
 
